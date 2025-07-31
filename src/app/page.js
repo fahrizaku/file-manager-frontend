@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { RefreshCw, FolderOpen, CheckCircle } from "lucide-react";
 import FileUpload from "../components/FileUpload";
 import FileList from "../components/FileList";
+import BulkActions from "../components/BulkActions";
 import fileService from "../services/fileService";
 
 export default function Home() {
@@ -11,6 +12,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notification, setNotification] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState([]);
 
   // Load files on component mount
   useEffect(() => {
@@ -36,10 +38,17 @@ export default function Home() {
     }
   };
 
-  // Handle successful file upload
-  const handleUploadSuccess = (newFile) => {
-    setFiles((prev) => [newFile, ...prev]);
-    showNotification("File uploaded successfully!");
+  // Handle successful file upload (single or bulk)
+  const handleUploadSuccess = (newFiles) => {
+    if (Array.isArray(newFiles)) {
+      // Bulk upload
+      setFiles((prev) => [...newFiles, ...prev]);
+      showNotification(`${newFiles.length} files uploaded successfully!`);
+    } else {
+      // Single upload
+      setFiles((prev) => [newFiles, ...prev]);
+      showNotification("File uploaded successfully!");
+    }
   };
 
   // Handle upload error
@@ -50,7 +59,16 @@ export default function Home() {
   // Handle file deletion
   const handleFileDeleted = (fileId) => {
     setFiles((prev) => prev.filter((file) => file.id !== fileId));
+    // Remove from selection if selected
+    setSelectedFiles((prev) => prev.filter((file) => file.id !== fileId));
     showNotification("File deleted successfully!");
+  };
+
+  // Handle bulk file deletion
+  const handleBulkFilesDeleted = (fileIds) => {
+    setFiles((prev) => prev.filter((file) => !fileIds.includes(file.id)));
+    setSelectedFiles([]);
+    showNotification(`${fileIds.length} files deleted successfully!`);
   };
 
   // Handle file update
@@ -58,7 +76,43 @@ export default function Home() {
     setFiles((prev) =>
       prev.map((file) => (file.id === updatedFile.id ? updatedFile : file))
     );
+    // Update in selection if selected
+    setSelectedFiles((prev) =>
+      prev.map((file) => (file.id === updatedFile.id ? updatedFile : file))
+    );
     showNotification("File updated successfully!");
+  };
+
+  // Handle file selection
+  const handleFileSelect = (file) => {
+    setSelectedFiles((prev) => {
+      const isAlreadySelected = prev.some((f) => f.id === file.id);
+      if (isAlreadySelected) {
+        return prev.filter((f) => f.id !== file.id);
+      } else {
+        return [...prev, file];
+      }
+    });
+  };
+
+  // Handle file deselection
+  const handleFileDeselect = (file) => {
+    setSelectedFiles((prev) => prev.filter((f) => f.id !== file.id));
+  };
+
+  // Select all files
+  const handleSelectAll = () => {
+    setSelectedFiles([...files]);
+  };
+
+  // Deselect all files
+  const handleDeselectAll = () => {
+    setSelectedFiles([]);
+  };
+
+  // Clear selection
+  const handleClearSelection = () => {
+    setSelectedFiles([]);
   };
 
   // Show temporary notification
@@ -136,6 +190,18 @@ export default function Home() {
             </div>
           </section>
 
+          {/* Bulk Actions */}
+          {selectedFiles.length > 0 && (
+            <BulkActions
+              selectedFiles={selectedFiles}
+              allFiles={files}
+              onFilesDeleted={handleBulkFilesDeleted}
+              onClearSelection={handleClearSelection}
+              onSelectAll={handleSelectAll}
+              onDeselectAll={handleDeselectAll}
+            />
+          )}
+
           {/* Files Section */}
           <section>
             <div className="bg-white rounded-lg shadow-sm border p-6">
@@ -145,6 +211,11 @@ export default function Home() {
                   {files.length > 0 && (
                     <span className="text-sm font-normal text-gray-500">
                       ({files.length} file{files.length !== 1 ? "s" : ""})
+                      {selectedFiles.length > 0 && (
+                        <span className="ml-2 px-2 py-1 bg-primary/10 text-primary rounded-full text-xs">
+                          {selectedFiles.length} selected
+                        </span>
+                      )}
                     </span>
                   )}
                 </h2>
@@ -158,8 +229,11 @@ export default function Home() {
               ) : (
                 <FileList
                   files={files}
+                  selectedFiles={selectedFiles}
                   onFileDeleted={handleFileDeleted}
                   onFileUpdated={handleFileUpdated}
+                  onFileSelect={handleFileSelect}
+                  onFileDeselect={handleFileDeselect}
                 />
               )}
             </div>
@@ -171,7 +245,7 @@ export default function Home() {
       <footer className="bg-white border-t mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <p className="text-center text-sm text-gray-500">
-            Simple File Management System - Built with Next.js & Hono
+            Simple File Management System - Built with Next.js & Express.js
           </p>
         </div>
       </footer>
